@@ -2,22 +2,23 @@
 
 ## Overall
 
-The project is based on substrate node template wsuch as this consists of a number of components that are spread across a few
-directories.
+The project is based on substrate node template, such as this consists of a number of components that are spread across several directories.
 
-An account *migration_vault_account* was added and prefunded with total supply coins as per original network. Which is passed to the *migration* pallet configuration.
+An account *migration_vault_account* was added and pre-funded with total supply coins as per original network. Which is passed to the *migration* pallet configuration.
 
 Additionally, *migration_owner* address is passed to the pallet config as the owner of the migration the only address authorised to perform the action.
 
-The migration pallet has exposed *migrate* method to tranfer the received amount from pre-configured migration vault and transfer to the received account.
+The migration pallet has exposed *migrate* method to transfer the received amount from pre-configured migration vault and transfer to the received account.
 
 ## Security
 
-The migration pallet can only be triggered by the designated addres, who has migration owner role.
+The migration pallet can only be triggered by the designated address, who has migration owner role.
+
+## Integrity
+
+As executing transactions uses up tokens and decreases the overall token supply, additional token was created for the gas utility - GAS. This token uses *balances* pallet, while the migrated token uses *assets* pallet. This results exact migration of all the tokens, without loosing anything to the migration process.
 
 ## Limitations
-
-Executing transactions uses up tokens and decreases the overall token supply, which will lead to out of sync of the migration process. Ideally, the gas should be paid by another token, which doesn't affect the migrated token.
 
 While it is possible to use the same private key for the source and destination networks, this is generally considered not recommended practice and anti-pattern. As such, without knowing destination accounts ahead of time, the accounts need to be passed during the migration.
 

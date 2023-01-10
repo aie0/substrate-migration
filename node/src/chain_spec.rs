@@ -70,8 +70,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 					get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-					//get_account_id_from_seed::<sr25519::Public>("MigrationVault")
+					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash")
 				],
 				true,
 			)
@@ -95,7 +94,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 
 	let mut properties = json::map::Map::new();
 	properties.insert("tokenDecimals".to_string(), 12.into());
-	properties.insert("tokenSymbol".to_string(), "JUR".into());
+	properties.insert("tokenSymbol".to_string(), "GAS".into());
 
 	Ok(ChainSpec::from_genesis(
 		// Name
@@ -125,8 +124,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 					get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-					//get_account_id_from_seed::<sr25519::Public>("MigrationVault")
+					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash")
 				],
 				true,
 			)

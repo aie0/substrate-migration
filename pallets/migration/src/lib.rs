@@ -1,104 +1,194 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
-
-#[cfg(test)]
-mod mock;
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
+	use frame_support::{ debug };
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	use frame_support::traits::{ Currency };
+	use frame_support::sp_runtime::traits::{ IdentifyAccount, Convert};
+	use frame_support::sp_runtime::FixedPointOperand;
+    use frame_support::traits::tokens::{Balance};
+	use frame_support::traits::fungibles::{Inspect, Transfer};
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	/// Configure the pallet by specifying the parameters and types on which it depends.
+	type BalanceOf<T> = <<T as Config>::LocalToken as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	type AssetBalanceOf<T> = <T as Config>::AssetBalance;
+
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type LocalToken: Currency<Self::AccountId>;
+		type TokenId: Member + Parameter + Copy + MaybeSerializeDeserialize + MaxEncodedLen;
+		
+		// Two-way conversion between asset and currency balances
+		type AssetToCurrencyBalance: Convert<Self::AssetBalance, BalanceOf<Self>>;
+		type CurrencyToAssetBalance: Convert<BalanceOf<Self>, Self::AssetBalance>;
+		
+		type AssetBalance: Balance
+			+ FixedPointOperand
+			+ MaxEncodedLen
+			+ MaybeSerializeDeserialize
+			+ TypeInfo;
+		type Assets: Inspect<Self::AccountId, AssetId = Self::TokenId, Balance = Self::AssetBalance> + Transfer<Self::AccountId>;
+		type MigrationVaultAccount: IdentifyAccount;
+		type MigrationOwner: IdentifyAccount;
 	}
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
-	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	pub trait ConfigHelper: Config {
+        fn currency_to_asset(curr_balance: BalanceOf<Self>) -> AssetBalanceOf<Self>;
+        fn asset_to_currency(asset_balance: AssetBalanceOf<Self>) -> BalanceOf<Self>;
+    }
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
+    impl<T: Config> ConfigHelper for T {
+        #[inline(always)]
+        fn currency_to_asset(curr_balance: BalanceOf<Self>) -> AssetBalanceOf<Self> {
+            Self::CurrencyToAssetBalance::convert(curr_balance)
+        }
+
+        #[inline(always)]
+        fn asset_to_currency(asset_balance: AssetBalanceOf<Self>) -> BalanceOf<Self> {
+            Self::AssetToCurrencyBalance::convert(asset_balance)
+        }
+    }
+
+	#[pallet::storage]
+	#[pallet::getter(fn vault)]
+	pub type MigrationVaultAccount<T: Config> = StorageValue<_, T::AccountId>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn owner)]
+	pub type MigrationOwner<T: Config> = StorageValue<_, T::AccountId>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn token_id)]
+	pub type TokenId<T: Config> = StorageValue<_, T::TokenId>;
+
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config> {
+		pub migration_vault_account: Option<T::AccountId>,
+		pub migration_owner: Option<T::AccountId>,
+		pub asset_id: Option<T::TokenId>
+	}
+
+	#[cfg(feature = "std")]
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> Self {
+			Self { 
+				migration_vault_account: Option::None,
+				migration_owner: Option::None,
+				asset_id: Option::None
+			}
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+		fn build(&self) {
+			let tmp1 = self.migration_vault_account.clone();
+			match tmp1 {
+				Some(a) => <MigrationVaultAccount<T>>::put(a),
+				None => debug(&Error::<T>::MigrationVaultAccountNoValue),
+			}
+
+			let tmp2 = self.migration_owner.clone();
+			match tmp2 {
+				Some(a) => <MigrationOwner<T>>::put(a),
+				None => debug(&Error::<T>::MigrationOwnerNoValue),
+			}
+
+			let tmp3 = self.asset_id.clone();
+			match tmp3 {
+				Some(a) => <TokenId<T>>::put(a),
+				None => debug(&Error::<T>::AssetIdNoValue),
+			}
+		}
+	}
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored { something: u32, who: T::AccountId },
+		BalanceMigrated { 
+			amount: BalanceOf<T>,
+			from_vault: T::AccountId, 
+			for_account: [u8; 32], 
+			to_account: T::AccountId,
+			vault_balance_remained: BalanceOf<T>,
+			account_balance_after: BalanceOf<T>,
+		},
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		Unauthorised,
+		MigrationVaultAccountNoValue,
+		MigrationOwnerNoValue,
+		AssetIdNoValue
 	}
-
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
+	
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
+		
 		#[pallet::call_index(0)]
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
+		#[pallet::weight(10_000)]
+		pub fn migrate(origin: OriginFor<T>, for_account: [u8; 32], account_to_credit: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			// Update storage.
-			<Something<T>>::put(something);
+			ensure!( <MigrationVaultAccount<T>>::exists(),
+				Error::<T>::MigrationVaultAccountNoValue
+			);
 
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored { something, who });
-			// Return a successful DispatchResultWithPostInfo
-			Ok(())
-		}
+			ensure!(<MigrationOwner<T>>::exists(),
+				Error::<T>::MigrationOwnerNoValue
+			);
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::call_index(1)]
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+			ensure!(<TokenId<T>>::exists(),
+				Error::<T>::AssetIdNoValue
+			);
 
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
+			let owner = <MigrationOwner<T>>::get().unwrap();
+			let migration_account = <MigrationVaultAccount<T>>::get().unwrap();
+			let asset_id = <TokenId<T>>::get().unwrap();
+			let migration_amount = T::currency_to_asset(amount);
+
+			#[cfg(feature = "std")]
+			{
+				debug(&format!("The vault is: {migration_account:?}"));
+				debug(&format!("The owner is: {owner:?}"));
+				debug(&format!("The sender is: {who:?}"));
 			}
+
+			ensure!(
+				owner == who,
+				Error::<T>::Unauthorised
+			);
+			
+			T::Assets::transfer(asset_id, &migration_account, &account_to_credit, migration_amount, true)?;
+
+			let vault_balance = T::Assets::balance(asset_id, &migration_account);
+			let account_balance = T::Assets::balance(asset_id, &account_to_credit);
+
+			#[cfg(feature = "std")]
+			{
+				debug(&format!("Vault balance: {vault_balance:?}"));
+				debug(&format!("Account balance: {account_balance:?}"));
+			}
+			
+			Self::deposit_event(Event::BalanceMigrated {
+				amount: amount,
+				from_vault: migration_account, 
+				for_account: for_account, 
+				to_account: account_to_credit,
+				vault_balance_remained: T::asset_to_currency(vault_balance),
+				account_balance_after: T::asset_to_currency(account_balance),
+			});
+			Ok(())
 		}
 	}
 }

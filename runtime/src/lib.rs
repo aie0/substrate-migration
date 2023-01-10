@@ -12,10 +12,11 @@ use pallet_grandpa::{
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
+use frame_support::traits::Currency;
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, Verify,
+		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, Verify, Identity
 	},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, MultiSignature,
@@ -24,12 +25,13 @@ use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
+use sp_core::sr25519::Public;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
-		ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, Randomness, StorageInfo,
+		ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, Randomness, StorageInfo, AsEnsureOriginWithArg,
 	},
 	weights::{
 		constants::{
@@ -39,6 +41,7 @@ pub use frame_support::{
 	},
 	StorageValue,
 };
+use frame_system::{EnsureSigned};
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
@@ -241,7 +244,7 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 /// Existential deposit.
-pub const EXISTENTIAL_DEPOSIT: u128 = 500;
+pub const EXISTENTIAL_DEPOSIT: u128 = 1;
 
 impl pallet_balances::Config for Runtime {
 	type MaxLocks = ConstU32<50>;
@@ -257,13 +260,34 @@ impl pallet_balances::Config for Runtime {
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 }
 
+impl pallet_assets::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Balance = u128;
+	type AssetId = u32;
+	type AssetIdParameter = codec::Compact<u32>;
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
+	type Currency = Balances;
+	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
+	type AssetDeposit = ConstU128<1>;
+	type AssetAccountDeposit = ConstU128<1>;
+	type MetadataDepositBase = ConstU128<1>;
+	type MetadataDepositPerByte = ConstU128<1>;
+	type ApprovalDeposit = ConstU128<1>;
+	type StringLimit = ConstU32<50>;
+	type Freezer = ();
+	type Extra = ();
+	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
+	type RemoveItemsLimit = ConstU32<1000>;
+	type CallbackHandle = ();
+}
+
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
+	type OnChargeTransaction = CurrencyAdapter<Balances, ()>; // charge from balances
 	type OperationalFeeMultiplier = ConstU8<5>;
 	type WeightToFee = IdentityFee<Balance>;
 	type LengthToFee = IdentityFee<Balance>;
@@ -277,7 +301,15 @@ impl pallet_sudo::Config for Runtime {
 
 /// Configure the pallet-migration in pallets/migration.
 impl pallet_migration::Config for Runtime {
+	type TokenId = u32;
 	type RuntimeEvent = RuntimeEvent;
+	type AssetToCurrencyBalance = Identity;
+	type CurrencyToAssetBalance = Identity;
+	type LocalToken = Balances;
+	type Assets = Assets;
+	type AssetBalance = <pallet_balances::Pallet<Runtime> as Currency<AccountId>>::Balance;
+	type MigrationVaultAccount = Public;
+	type MigrationOwner = Public;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -294,9 +326,9 @@ construct_runtime!(
 		Aura: pallet_aura,
 		Grandpa: pallet_grandpa,
 		Balances: pallet_balances,
+		Assets:  pallet_assets,
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
-		// Include the custom logic from the pallet-migration in the runtime.
 		Migration: pallet_migration,
 	}
 );

@@ -43,8 +43,8 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	// Storage: Assets Account (r:2 w:2)
 	// Storage: System Account (r:1 w:1)
 	fn migrate() -> Weight {
-		// Minimum execution time: 66_000 nanoseconds.
-		Weight::from_ref_time(67_000_000)
+		// Minimum execution time: 64_000 nanoseconds.
+		Weight::from_ref_time(66_000_000)
 			.saturating_add(T::DbWeight::get().reads(7))
 			.saturating_add(T::DbWeight::get().writes(4))
 	}
@@ -59,8 +59,8 @@ impl WeightInfo for () {
 	// Storage: Assets Account (r:2 w:2)
 	// Storage: System Account (r:1 w:1)
 	fn migrate() -> Weight {
-		// Minimum execution time: 66_000 nanoseconds.
-		Weight::from_ref_time(67_000_000)
+		// Minimum execution time: 64_000 nanoseconds.
+		Weight::from_ref_time(66_000_000)
 			.saturating_add(RocksDbWeight::get().reads(7))
 			.saturating_add(RocksDbWeight::get().writes(4))
 	}

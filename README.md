@@ -48,6 +48,24 @@ without launching it:
 cargo build --release
 ```
 
+### Test
+
+The `cargo test` command will perform testing of the pallets.
+
+### Benchmarking
+
+#### Build
+
+The `cargo build --release --features=runtime-benchmarks` command will perform build of the code for the benchmarking.
+
+#### Benchmarking
+
+The `./target/release/node-template benchmark pallet --dev --steps=50 --repeat=20 --pallet=pallet_migration --extrinsic=migrate --execution=wasm --wasm-execution=compiled --heap-pages=4096 --output=./pallets/migration/src/weights.rs --template=./.maintain/frame-weight-template.hbs` command will perform the benchmarking of the migration pallet.
+
+#### Test
+
+The `cargo test --package pallet-migration --features runtime-benchmarks` command will perform benchmarking testsing of the migration pallet.
+
 ### Single-Node Development Chain
 
 This command will start the single-node development chain with non-persistent state:

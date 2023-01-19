@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
+pub use weights::WeightInfo;
 
 #[cfg(test)]
 mod mock;
@@ -14,8 +15,11 @@ mod helpers;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+pub mod weights;
+
 #[frame_support::pallet]
 pub mod pallet {
+	#[allow(unused)]
 	use frame_support::{ debug };
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
@@ -23,11 +27,23 @@ pub mod pallet {
 	use frame_support::sp_runtime::traits::{ IdentifyAccount, Convert};
 	use frame_support::sp_runtime::FixedPointOperand;
     use frame_support::traits::tokens::{Balance};
-	use frame_support::traits::fungibles::{Inspect, Transfer};
+	use frame_support::traits::fungibles::{Inspect, Transfer, Create, Mutate};
+	use crate::weights::*;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub trait BenchmarkHelper<AssetIdParameter> {
+		fn create_asset_id_parameter(id: u32) -> AssetIdParameter;
+	}
+	#[cfg(feature = "runtime-benchmarks")]
+	impl<AssetIdParameter: From<u32>> BenchmarkHelper<AssetIdParameter> for () {
+		fn create_asset_id_parameter(id: u32) -> AssetIdParameter {
+			id.into()
+		}
+	}
 
 	type BalanceOf<T> = <<T as Config>::LocalToken as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 	type AssetBalanceOf<T> = <T as Config>::AssetBalance;
@@ -47,9 +63,21 @@ pub mod pallet {
 			+ MaxEncodedLen
 			+ MaybeSerializeDeserialize
 			+ TypeInfo;
-		type Assets: Inspect<Self::AccountId, AssetId = Self::TokenId, Balance = Self::AssetBalance> + Transfer<Self::AccountId>;
+		type Assets: Inspect<Self::AccountId, AssetId = Self::TokenId, Balance = Self::AssetBalance> + Transfer<Self::AccountId> + Create<Self::AccountId> + Mutate<Self::AccountId>;
 		type MigrationVaultAccount: IdentifyAccount;
 		type MigrationOwner: IdentifyAccount;
+		type WeightInfo: crate::weights::WeightInfo;
+
+		// Helper trait for benchmarks.
+		#[cfg(feature = "runtime-benchmarks")]
+		type BenchmarkHelper: BenchmarkHelper<Self::AssetIdParameter>;
+
+		#[cfg(feature = "runtime-benchmarks")]
+		type AssetIdParameter: Parameter
+		+ Copy
+		+ From<Self::TokenId>
+		+ Into<Self::TokenId>
+		+ MaxEncodedLen;
 	}
 
 	pub trait ConfigHelper: Config {
@@ -76,10 +104,6 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn get_owner)]
 	pub type MigrationOwner<T: Config> = StorageValue<_, T::AccountId>;
-
-	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	pub type Something<T> = StorageValue<_, u32>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn get_token_id)]
@@ -152,7 +176,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		
 		#[pallet::call_index(0)]
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(5,1).ref_time())]
+		#[pallet::weight(T::WeightInfo::migrate())]
 		pub fn migrate(origin: OriginFor<T>, for_account: [u8; 32], account_to_credit: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -204,19 +228,6 @@ pub mod pallet {
 				vault_balance_remained: T::asset_to_currency(vault_balance),
 				account_balance_after: T::asset_to_currency(account_balance),
 			});
-			Ok(())
-		}
-
-		#[pallet::call_index(1)]
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
-			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			<Something<T>>::put(something);
 			Ok(())
 		}
 	}

@@ -1,8 +1,6 @@
 use crate::{mock::*, helpers::*, Error, Event};
 use frame_support::{assert_noop, assert_ok};
 use sp_core::{sr25519};
-use frame_system::Config;
-use sp_runtime::traits::StaticLookup;
 
 #[test]
 fn correct_error_for_unauthorised() {

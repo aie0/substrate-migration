@@ -279,6 +279,7 @@ impl pallet_assets::Config for Runtime {
 	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
 	type RemoveItemsLimit = ConstU32<1000>;
 	type CallbackHandle = ();
+	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = ();
 }
 
@@ -311,6 +312,12 @@ impl pallet_migration::Config for Runtime {
 	type AssetBalance = <pallet_balances::Pallet<Runtime> as Currency<AccountId>>::Balance;
 	type MigrationVaultAccount = Public;
 	type MigrationOwner = Public;
+	type WeightInfo = pallet_migration::weights::SubstrateWeight<Runtime>;
+	
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type AssetIdParameter = codec::Compact<u32>;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

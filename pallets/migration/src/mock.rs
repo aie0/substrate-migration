@@ -1,10 +1,12 @@
 use crate::{self as pallet_migration};
+#[cfg(feature = "runtime-benchmarks")]
+use frame_benchmarking::{account, whitelisted_caller};
 use frame_support::traits::{ConstU16, ConstU64, ConstU128, ConstU32, AsEnsureOriginWithArg, Currency};
-use sp_core::{H256};
+use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, IdentityLookup, Identity, AccountIdLookup},
-	MultiSignature, BuildStorage
+	traits::{BlakeTwo256, Identity, AccountIdLookup},
+	BuildStorage
 };
 use sp_core::sr25519::Public;
 use frame_system::{EnsureSigned};
@@ -14,6 +16,10 @@ type Block = frame_system::mocking::MockBlock<TestSuite>;
 type AccountId = crate::helpers::AccountId;
 
 const TOKEN_ID: u32 = 1;
+#[cfg(feature = "runtime-benchmarks")]
+const SEED: u32 = 0;
+#[cfg(feature = "runtime-benchmarks")]
+const VAULT_INDEX: u32 = 4;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -66,6 +72,12 @@ impl pallet_migration::Config for TestSuite {
 	type AssetBalance = <pallet_balances::Pallet<TestSuite> as Currency<AccountId>>::Balance;
 	type MigrationVaultAccount = Public;
 	type MigrationOwner = Public;
+	type WeightInfo = ();
+
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type AssetIdParameter = codec::Compact<u32>;
 }
 
 /// Existential deposit.
@@ -106,6 +118,31 @@ impl pallet_assets::Config for TestSuite {
 	type WeightInfo = pallet_assets::weights::SubstrateWeight<TestSuite>;
 	type RemoveItemsLimit = ConstU32<1000>;
 	type CallbackHandle = ();
+}
+
+#[cfg(feature = "runtime-benchmarks")]
+pub fn new_default_ext() -> sp_io::TestExternalities {
+	frame_system::GenesisConfig::default().build_storage::<TestSuite>().unwrap().into()
+}
+
+#[cfg(feature = "runtime-benchmarks")]
+pub fn new_benchmark_ext() -> sp_io::TestExternalities {
+	let caller: AccountId = whitelisted_caller();
+
+	let account1 = account::<AccountId>("Alice", 1, SEED);
+	let account2 = account::<AccountId>("Bob", 2, SEED);
+	let account3 = account::<AccountId>("Charlie", 3, SEED);
+
+	let mut users = Vec::new();
+	users.push(account1.clone());
+	users.push(account2.clone());
+	users.push(account3.clone());
+
+	let migration_vault_account = account::<AccountId>("MigrationVault", VAULT_INDEX, SEED);
+	let migration_owner_account = caller.clone();
+	let vault_total = 1_000_000;
+
+	new_test_ext(users, caller, vault_total, migration_vault_account.clone(), migration_owner_account.clone())
 }
 
 pub fn new_test_ext(users: Vec<AccountId>, root_key: AccountId, vault_total: u128, migration_vault_account: AccountId, migration_owner_account: AccountId) -> sp_io::TestExternalities {

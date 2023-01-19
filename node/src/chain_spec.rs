@@ -42,7 +42,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 
 	let mut properties = json::map::Map::new();
 	properties.insert("tokenDecimals".to_string(), 12.into());
-	properties.insert("tokenSymbol".to_string(), "JUR".into());
+	properties.insert("tokenSymbol".to_string(), "GAS".into());
 
 	Ok(ChainSpec::from_genesis(
 		// Name
@@ -170,7 +170,7 @@ fn testnet_genesis(
 
 		},
 		balances: BalancesConfig {
-			balances: 
+			balances:
 				endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
 		},
 		migration: MigrationConfig {

@@ -279,6 +279,7 @@ impl pallet_assets::Config for Runtime {
 	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
 	type RemoveItemsLimit = ConstU32<1000>;
 	type CallbackHandle = ();
+	type BenchmarkHelper = ();
 }
 
 parameter_types! {
@@ -375,6 +376,7 @@ mod benches {
 		[frame_benchmarking, BaselineBench::<Runtime>]
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
+		[pallet_assets, Assets]
 		[pallet_timestamp, Timestamp]
 		[pallet_migration, Migration]
 	);

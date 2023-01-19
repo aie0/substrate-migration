@@ -2,6 +2,18 @@
 
 pub use pallet::*;
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(test)]
+mod helpers;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{ debug };
@@ -58,15 +70,19 @@ pub mod pallet {
     }
 
 	#[pallet::storage]
-	#[pallet::getter(fn vault)]
+	#[pallet::getter(fn get_vault)]
 	pub type MigrationVaultAccount<T: Config> = StorageValue<_, T::AccountId>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn owner)]
+	#[pallet::getter(fn get_owner)]
 	pub type MigrationOwner<T: Config> = StorageValue<_, T::AccountId>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn token_id)]
+	#[pallet::getter(fn something)]
+	pub type Something<T> = StorageValue<_, u32>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn get_token_id)]
 	pub type TokenId<T: Config> = StorageValue<_, T::TokenId>;
 
 	#[pallet::genesis_config]
@@ -136,7 +152,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		
 		#[pallet::call_index(0)]
-		#[pallet::weight(10_000)]
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(5,1).ref_time())]
 		pub fn migrate(origin: OriginFor<T>, for_account: [u8; 32], account_to_credit: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -188,6 +204,19 @@ pub mod pallet {
 				vault_balance_remained: T::asset_to_currency(vault_balance),
 				account_balance_after: T::asset_to_currency(account_balance),
 			});
+			Ok(())
+		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
+		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
+			// Check that the extrinsic was signed and get the signer.
+			// This function will return an error if the extrinsic is not signed.
+			// https://docs.substrate.io/main-docs/build/origins/
+			let who = ensure_signed(origin)?;
+
+			// Update storage.
+			<Something<T>>::put(something);
 			Ok(())
 		}
 	}
